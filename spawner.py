@@ -40,7 +40,7 @@ class SpawnerNode(object):
         node.addKnob(knob)
         knob = nuke.XY_Knob("position_after", "position")
         node.addKnob(knob)
-        knob.setValue([0, -100])
+        knob.setValue([0, 100])
         knob = nuke.Text_Knob("div_02", "")
         node.addKnob(knob)
 
@@ -88,7 +88,7 @@ class SpawnerNode(object):
     def _collect_search_inputs(cls):
         node = nuke.thisNode()
 
-        knobs = [node[n].value() for n in node.knobs() if re.match(r'^input_\d+$', n)]
+        knobs = [str(node[n].toScript()) for n in node.knobs() if re.match(r'^input_\d+$', n)]
 
         input_data = {
             "file_list": knobs,
@@ -167,11 +167,12 @@ class SpawnerNode(object):
 
         # run post script
         script = spawner["input_post_script"].value()
-        if script != "":
+        if script != "" and spawned:
             post_script = """
+spawner = nuke.toNode("{}")
 spawned = [nuke.toNode(n) for n in "{}".split(",")]
 
-""".format(",".join([n.name() for n in spawned]))
+""".format(spawner.name(), ",".join([n.name() for n in spawned]))
 
             post_script += script
             exec(post_script)

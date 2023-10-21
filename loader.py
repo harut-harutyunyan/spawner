@@ -104,7 +104,7 @@ class PathsHandler(object):
 
     @classmethod
     def _handle_env(cls, string):
-        return os.getenv(string[4:], "")
+        return [os.getenv(string[4:], "")]
 
     @classmethod
     def _handle_regex(cls, filepath, string):
@@ -137,8 +137,29 @@ class PathsHandler(object):
             return []
 
     @classmethod
-    def _construct_file_name(cls, string):
-        pass
+    def _handle_folder_string(cls, current_path, string):
+        if string.startswith("env:"):
+            folder_list = cls._handle_env(string)
+        elif string.startswith("re:"):
+            folder_list = cls._handle_regex(current_path, string)
+        elif string.startswith("v:"):
+            folder_list = cls._handle_version(current_path, string)
+        else:
+            folder_list = [os.path.join(current_path, string)]
+
+        return folder_list
+
+    @classmethod
+    def _construct_file_names(cls, current_path, string):
+        results =[]
+
+        folder_list = cls._handle_folder_string(current_path, string)
+        for folder in folder_list:
+            new_path = os.path.join(current_path, folder)
+            if os.path.exists(new_path):
+                results.append(new_path)
+
+        return results
 
     @classmethod
     def _construct_file_paths(cls, string_list, current_path=""):
@@ -148,27 +169,8 @@ class PathsHandler(object):
         string, *tail = string_list
         results = []
 
-        if string.startswith("env:"):
-            new_path = os.path.join(current_path, cls._handle_env(string))
-            if os.path.exists(new_path):
-                results.extend(cls._construct_file_paths(tail, new_path))
-
-        if string.startswith("re:"):
-            for folder in cls._handle_regex(current_path, string):
-                new_path = os.path.join(current_path, folder)
-                if os.path.exists(new_path):
-                    results.extend(cls._construct_file_paths(tail, new_path))
-
-        if string.startswith("v:"):
-            for folder in cls._handle_version(current_path, string):
-                new_path = os.path.join(current_path, folder)
-                if os.path.exists(new_path):
-                    results.extend(cls._construct_file_paths(tail, new_path))
-
-        else:
-            new_path = os.path.join(current_path, string)
-            if os.path.exists(new_path):
-                results.extend(cls._construct_file_paths(tail, new_path))
+        for path in cls._construct_file_names(current_path, string):
+            results.extend(cls._construct_file_paths(tail, path))
 
         return results
 
