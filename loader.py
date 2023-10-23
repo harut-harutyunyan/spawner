@@ -5,17 +5,17 @@ import re
 import pyseq
 
 # env
-os.environ["MY_WORK_ROOT"] = "/Users/harut/Documents/harut/prj"
-os.environ["MY_PROJECT_ABBR"] = "trainvfx"
-os.environ["MY_SEQUENCE"] = "int010"
-os.environ["MY_SHOT"] = "int010_0020"
-os.environ["MY_TASK_NAME"] = "scan"
+# os.environ["MY_WORK_ROOT"] = "/Users/harut/Documents/harut/prj"
+# os.environ["MY_PROJECT_ABBR"] = "trainvfx"
+# os.environ["MY_SEQUENCE"] = "int010"
+# os.environ["MY_SHOT"] = "int010_0020"
+# os.environ["MY_TASK_NAME"] = "scan"
 
 # example filepath
-filepath = "/Users/harut/Documents/harut/prj/trainvfx/int010/int010_0020/scan/fg01/v001/int010_0020_fg01.%04d.jpg"
+# filepath = "/Users/harut/Documents/harut/prj/trainvfx/int010/int010_0020/scan/fg01/v001/int010_0020_fg01.%04d.jpg"
 # example filelist
 # file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 'env:MY_SEQUENCE', 'env:MY_SHOT', 'scan', 'fg01', 'v001', 'int010_0020_fg01.1001.jpg']
-file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 're:.*', 're:.*', 'scan', 'fg01', 'v:all', r're:.*']
+# file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 're:.*', 're:.*', 'scan', 'fg01', 'v:all', r're:.*']
 
 
 WORK_ROOT = os.getenv("MY_WORK_ROOT", "")

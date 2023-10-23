@@ -7,9 +7,24 @@ from loader import PathsHandler
 import pyseq
 
 
+def deselect_all():
+    for node in nuke.selectedNodes():
+        node.setSelected(False)
+
+def get_spawners(selection):
+    results = []
+    for node in selection:
+        if node.knob("__spawner") and node.knob("input_spawn"):
+            results.append(node)
+
+    return results
+
+
 class SpawnerNode(object):
 
     CLASS = "NoOp"
+    INPANEL = False
+    VERSION = "v0.1"
 
     @classmethod
     def create(cls):
@@ -18,6 +33,15 @@ class SpawnerNode(object):
         node.knob("tile_color").setValue(1280068863)
 
         knob = nuke.Tab_Knob("Spawner")
+        node.addKnob(knob)
+        knob = nuke.Text_Knob("credit1", "", '<font size = 5 style="color:#F2E8C6">Outline VFX</font>')
+        node.addKnob(knob)
+        knob = nuke.Text_Knob("credit2", "", '<font size = 6 style="color:#FFBB5C"><b>Spawner</b></font>')
+        node.addKnob(knob)
+        knob = nuke.Text_Knob("credit3", "", '<font size = 3 style="color:#666"><br>{}</br></font>'.format(cls.VERSION))
+        knob.clearFlag(nuke.STARTLINE)
+        node.addKnob(knob)
+        knob = nuke.Text_Knob("div_00", "")
         node.addKnob(knob)
         knob = nuke.File_Knob("file", "file")
         node.addKnob(knob)
@@ -42,6 +66,9 @@ class SpawnerNode(object):
         node.addKnob(knob)
         knob.setValue([0, 100])
         knob = nuke.Text_Knob("div_02", "")
+        node.addKnob(knob)
+        knob = nuke.Text_Knob("__spawner", "")
+        knob.setVisible(False)
         node.addKnob(knob)
 
         return node
@@ -98,61 +125,90 @@ class SpawnerNode(object):
         return input_data
 
     @classmethod
-    def spawn(cls):
-        input_data = cls._collect_search_inputs()
-        file_list = input_data["file_list"]
-        is_seq = input_data["seq"]
-        spawner = input_data["node"]
+    def _create_read_node(cls, filepath):
+        read_node = nuke.createNode("Read", inpanel=cls.INPANEL)
+        read_node.knob("file").fromUserText(filepath)
+        return read_node
 
-        PathsHandler.SEQ = is_seq
+    @classmethod
+    def _handle_image_files(cls, is_seq, folder, content):
+        node_list = []
 
-        files_dict = PathsHandler.construct_file_paths(file_list)
-        spawned = []
-        for folder, content in files_dict.items():
-            if isinstance(content, list):
-                _, ext = os.path.splitext(content[0])
+        if is_seq:
+            if content.length() > 1:
+                seq = "{} {}".format(content.format("%h#%t"), content.format("%s-%e"))
             else:
-                _, ext = os.path.splitext(str(content))
+                seq = "{} {}".format(str(content), "1-1")
 
-            if ext in PathsHandler.FILE_FOLMATS[:9]:
-                if is_seq:
-                    if content.length() > 1:
-                        seq = "{} {}".format(content.format("%h#%t"), content.format("%s-%e"))
-                    else:
-                        seq = "{} {}".format(str(content), "1-1")
+            node_list.append(cls._create_read_node(os.path.join(folder, seq)))
+        else:
+            for seq in nuke.getFileNameList(folder):
+                if os.path.splitext(seq.rsplit(" ", 1)[0])[1] in PathsHandler.FILE_FOLMATS:
+                    node_list.append(cls._create_read_node(os.path.join(folder, seq)))
 
-                    read_node = nuke.createNode('Read', inpanel=False)
-                    read_node.knob("file").fromUserText(os.path.join(folder, seq))
-                    spawned.append(read_node)
+        return node_list
+
+    @classmethod
+    def _create_read_geo_node(cls, filepath):
+        read_node = nuke.createNode("ReadGeo2", inpanel=cls.INPANEL)
+        read_node.knob("file").setValue(filepath)
+        return read_node
+
+    @classmethod
+    def _create_camera_node(cls, filepath):
+        camera_node = nuke.createNode("Camera3", inpanel=False)
+        camera_node.knob("file").setValue(filepath)
+        camera_node["read_from_file"].setValue(1)
+        camera_node.showControlPanel()
+        return camera_node
+
+    @classmethod
+    def _handle_geo_files(cls, is_seq, folder, content, is_cam):
+        node_list = []
+
+        if is_seq:
+            if is_cam:
+                geo_node = cls._create_camera_node(os.path.join(folder, str(content)))
+            else:
+                geo_node = cls._create_read_geo_node(os.path.join(folder, str(content)))
+            node_list.append(geo_node)
+        else:
+            for file in content:
+                if is_cam:
+                    node_list.append(cls._create_camera_node(file))
                 else:
-                    for seq in nuke.getFileNameList(folder):
-                        if os.path.splitext(seq.rsplit(" ", 1)[0])[1] in PathsHandler.FILE_FOLMATS:
-                            read_node = nuke.createNode('Read')
-                            read_node.knob('file').fromUserText(os.path.join(folder, seq))
-                            spawned.append(read_node)
+                    node_list.append(cls._create_read_geo_node(file))
 
-            elif ext in PathsHandler.FILE_FOLMATS[9:12]:
-                if is_seq:
-                    read_node = nuke.createNode('ReadGeo2', inpanel=False)
-                    read_node.knob("file").setValue(os.path.join(folder, str(content)))
-                    spawned.append(read_node)
+        return node_list
 
-            elif ext in PathsHandler.FILE_FOLMATS[12:]:
+    @classmethod
+    def _handle_script_files(cls, is_seq, folder, content):
+        if is_seq:
+            nuke.nodePaste(os.path.join(folder, str(content)))
+        else:
+            for c in content:
+                nuke.nodePaste(os.path.join(c))
 
-                if is_seq:
-                    nuke.nodePaste(os.path.join(folder, str(content)))
-                else:
-                    for c in content:
-                        nuke.nodePaste(os.path.join(c))
-                # delete
-                if spawner["delete_after"].getValue() == 1.0:
-                    nuke.delete(spawner)
-                return
+    @classmethod
+    def _get_content_ext(cls, content):
+        if isinstance(content, list):
+            _, ext = os.path.splitext(content[0])
+        else:
+            _, ext = os.path.splitext(str(content))
 
-        for node in spawner.dependent(nuke.INPUTS):
-            node.setInput(0, spawned[0])
+        return ext
 
-        # position nodes and selection
+    @classmethod
+    def _post_spawn_connections(cls, spawner, spawned):
+        dep = spawner.dependent(nuke.INPUTS)
+        for n in dep:
+            for i in range(n.inputs()):
+                inpt = n.input(i)
+                if inpt and inpt==spawner:
+                    n.setInput(i, spawned[0])
+
+    @classmethod
+    def _post_spawn_positions(cls, spawner, spawned):
         position = spawner["position_after"].getValue()
         select = spawner["select_after"].getValue() == 1.0
         offset_x = 0
@@ -165,7 +221,8 @@ class SpawnerNode(object):
             if position[1] != 0:
                 offset_x += 100
 
-        # run post script
+    @classmethod
+    def _post_spawn_script(cls, spawner, spawned):
         script = spawner["input_post_script"].value()
         if script != "" and spawned:
             post_script = """
@@ -177,6 +234,114 @@ spawned = [nuke.toNode(n) for n in "{}".split(",")]
             post_script += script
             exec(post_script)
 
+
+    @classmethod
+    def _post_spawn_actions(cls, spawner, spawned):
+        if spawned:
+            cls._post_spawn_connections(spawner, spawned)
+            cls._post_spawn_positions(spawner, spawned)
+            cls._post_spawn_script(spawner, spawned)
+
+    @classmethod
+    def spawn(cls):
+
+        deselect_all()
+
+        input_data = cls._collect_search_inputs()
+        file_list = input_data["file_list"]
+        is_seq = input_data["seq"]
+        spawner = input_data["node"]
+        delete_after = spawner["delete_after"].getValue() == 1.0
+
+        PathsHandler.SEQ = is_seq
+
+        files_dict = PathsHandler.construct_file_paths(file_list)
+        spawned = []
+        for folder, content in files_dict.items():
+            ext = cls._get_content_ext(content)
+
+            if ext in PathsHandler.FILE_FOLMATS[:9]:
+                node_list = cls._handle_image_files(is_seq, folder, content)
+                spawned.extend(node_list)
+
+            elif ext in PathsHandler.FILE_FOLMATS[9:12]:
+                cam = spawner.knob("cam")
+                if cam:
+                    cam = cam.getValue() == 1.0
+                node_list = cls._handle_geo_files(is_seq, folder, content, cam)
+                spawned.extend(node_list)
+
+            elif ext in PathsHandler.FILE_FOLMATS[12:]:
+                cls._handle_script_files(is_seq, folder, content)
+                if delete_after:
+                    nuke.delete(spawner)
+                return
+            else:
+                return
+
+        cls._post_spawn_actions(spawner, spawned)
+
         # delete
-        if spawner["delete_after"].getValue() == 1.0:
+        if delete_after:
             nuke.delete(spawner)
+
+
+class SpawnerTemplates(object):
+
+    TEMPLATES_DIR = "/Users/harut/Documents/harut/dev/_templates"
+    SHOW_SPECIFIC = True
+    ROOT_NAME = "SPAWNER"
+
+    @classmethod
+    def __templates_path(cls):
+        if cls.SHOW_SPECIFIC:
+            return os.path.join(cls.TEMPLATES_DIR, os.getenv("MY_PROJECT_ABBR", ""))
+        return cls.TEMPLATES_DIR
+
+    @classmethod
+    def __get_templates_root(cls):
+        if cls.SHOW_SPECIFIC:
+            return os.getenv("MY_PROJECT_ABBR", "").upper()
+        return cls.ROOT_NAME
+
+    @classmethod
+    def _get_templates(cls):
+        search_path = cls.__templates_path()
+        templates = []
+
+        for root, dirs, files in os.walk(search_path):
+            for file in files:
+                if file.endswith('.nk'):
+                    templates.append("{}{}/{}".format(cls.__get_templates_root(), root.replace(search_path, ""), file[:-3]))
+
+        return templates
+
+    @classmethod
+    def _clear_toolbar(cls):
+        nuke.toolbar("Nodes").removeItem(cls.__get_templates_root())
+
+    @classmethod
+    def load_template(cls, template_path):
+        deselect_all()
+        nuke.nodePaste(template_path)
+        spawners = get_spawners(nuke.selectedNodes())
+        for spawner in spawners:
+            spawner["input_spawn"].execute()
+
+    @classmethod
+    def reload_toolbar(cls):
+        cls._clear_toolbar()
+        cls.initialize()
+
+    @classmethod
+    def initialize(cls):
+        toolbar = nuke.toolbar("Nodes")
+        root_name = cls.__get_templates_root()
+        toolbar = toolbar.addMenu(root_name)
+
+        for template in cls._get_templates():
+            template_path = "{}{}.nk".format(cls.__templates_path(), template.replace(root_name, ""))
+            toolbar.addCommand(template.replace(root_name+"/", ""), "import spawner\nspawner.SpawnerTemplates.load_template('{}')".format(template_path))
+
+        toolbar.addSeparator()
+        toolbar.addCommand("Reload", "import spawner\nspawner.SpawnerTemplates.reload_toolbar()")
