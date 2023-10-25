@@ -5,17 +5,17 @@ import re
 import pyseq
 
 # env
-# os.environ["MY_WORK_ROOT"] = "/Users/harut/Documents/harut/prj"
-# os.environ["MY_PROJECT_ABBR"] = "trainvfx"
-# os.environ["MY_SEQUENCE"] = "int010"
-# os.environ["MY_SHOT"] = "int010_0020"
-# os.environ["MY_TASK_NAME"] = "scan"
+os.environ["MY_WORK_ROOT"] = "/Users/harut/Documents/harut/prj"
+os.environ["MY_PROJECT_ABBR"] = "trainvfx"
+os.environ["MY_SEQUENCE"] = "int010"
+os.environ["MY_SHOT"] = "int010_0020"
+os.environ["MY_TASK_NAME"] = "scan"
 
 # example filepath
 # filepath = "/Users/harut/Documents/harut/prj/trainvfx/int010/int010_0020/scan/fg01/v001/int010_0020_fg01.%04d.jpg"
 # example filelist
 # file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 'env:MY_SEQUENCE', 'env:MY_SHOT', 'scan', 'fg01', 'v001', 'int010_0020_fg01.1001.jpg']
-# file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 're:.*', 're:.*', 'scan', 'fg01', 'v:all', r're:.*']
+file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 'env:MY_SEQUENCE', 'env:MY_SHOT', 'scan', 'fg01', 'v:latest', r're:\w+[\._]\d+\.jpg$']
 
 
 WORK_ROOT = os.getenv("MY_WORK_ROOT", "")
@@ -137,15 +137,35 @@ class PathsHandler(object):
             return []
 
     @classmethod
+    def _handle_nested(cls, current_path, string):
+        new_string = string[1:]
+        folder_list = cls._handle_folder_string(current_path, new_string)
+        if folder_list:
+            return folder_list
+        else:
+            new_path = [os.path.join(current_path, f) for f in os.listdir(current_path) if os.path.isdir(os.path.join(current_path, f))][0]
+            return {new_path: cls._handle_folder_string(new_path, new_string)}
+
+    @classmethod
+    def _handle_string(cls, current_path, string):
+        if os.path.exists(os.path.join(current_path, string)):
+            return [string]
+        else:
+            return []
+
+    @classmethod
     def _handle_folder_string(cls, current_path, string):
-        if string.startswith("env:"):
+
+        if string.startswith("|"):
+            folder_list = cls._handle_nested(current_path, string)
+        elif string.startswith("env:"):
             folder_list = cls._handle_env(string)
         elif string.startswith("re:"):
             folder_list = cls._handle_regex(current_path, string)
         elif string.startswith("v:"):
             folder_list = cls._handle_version(current_path, string)
         else:
-            folder_list = [os.path.join(current_path, string)]
+            folder_list = cls._handle_string(current_path, string)
 
         return folder_list
 
@@ -154,6 +174,9 @@ class PathsHandler(object):
         results =[]
 
         folder_list = cls._handle_folder_string(current_path, string)
+        if isinstance(folder_list, dict):
+            current_path = list(folder_list.keys())[0]
+            folder_list = folder_list[current_path]
         for folder in folder_list:
             new_path = os.path.join(current_path, folder)
             if os.path.exists(new_path):
@@ -199,12 +222,16 @@ class PathsHandler(object):
 
 if __name__ == '__main__':
 
-    file_list = PathsHandler._split(filepath)
-    print(file_list)
+    # file_list = PathsHandler._split(filepath)
+    # print(file_list)
     # PathsHandler.SEQ = False
 
-    dd = PathsHandler.construct_file_paths(file_list)
+    # dd = PathsHandler.construct_file_paths(file_list)
 
-    for i in dd.keys():
-        print(dd[i])
+    # for i in dd.keys():
+    #     print(dd[i])
+
+    c = '/Users/harut/Documents/harut/prj/trainvfx/int010/int010_0020/scan'
+    test = PathsHandler._construct_file_names(c, '|v:latest')
+    print(test)
 

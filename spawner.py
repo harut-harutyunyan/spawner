@@ -24,7 +24,7 @@ class SpawnerNode(object):
 
     CLASS = "NoOp"
     INPANEL = False
-    VERSION = "v0.1"
+    VERSION = "v0.2"
 
     @classmethod
     def create(cls):
@@ -93,6 +93,10 @@ class SpawnerNode(object):
             path_list = PathsHandler._split(file_path, guess)
             for i, string in enumerate(path_list):
                 knob = nuke.String_Knob("input_{}".format(i), "search".format(i), string)
+                node.addKnob(knob)
+                remove_script = "n=nuke.thisNode()\nn.removeKnob(n['input_{0}'])\nn.removeKnob(nuke.thisKnob())".format(i)
+                knob = nuke.PyScript_Knob("input_{}_x".format(i), "X", remove_script)
+                knob.clearFlag(nuke.STARTLINE)
                 node.addKnob(knob)
             knob = nuke.Text_Knob("input_div", "")
             node.addKnob(knob)
@@ -225,12 +229,8 @@ class SpawnerNode(object):
     def _post_spawn_script(cls, spawner, spawned):
         script = spawner["input_post_script"].value()
         if script != "" and spawned:
-            post_script = """
-spawner = nuke.toNode("{}")
-spawned = [nuke.toNode(n) for n in "{}".split(",")]
-
-""".format(spawner.name(), ",".join([n.name() for n in spawned]))
-
+            post_script = "spawner = nuke.toNode(\"{}\")\n".format(spawner.name())
+            post_script += "spawned = [nuke.toNode(n) for n in \"{}\".split(\",\")]\n".format(",".join([n.name() for n in spawned]))
             post_script += script
             exec(post_script)
 
