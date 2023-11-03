@@ -4,20 +4,6 @@ import re
 
 import pyseq
 
-# env
-os.environ["MY_WORK_ROOT"] = "/Users/harut/Documents/harut/prj"
-os.environ["MY_PROJECT_ABBR"] = "trainvfx"
-os.environ["MY_SEQUENCE"] = "int010"
-os.environ["MY_SHOT"] = "int010_0020"
-os.environ["MY_TASK_NAME"] = "scan"
-
-# example filepath
-# filepath = "/Users/harut/Documents/harut/prj/trainvfx/int010/int010_0020/scan/fg01/v001/int010_0020_fg01.%04d.jpg"
-# example filelist
-# file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 'env:MY_SEQUENCE', 'env:MY_SHOT', 'scan', 'fg01', 'v001', 'int010_0020_fg01.1001.jpg']
-file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR', 'env:MY_SEQUENCE', 'env:MY_SHOT', 'scan', 'fg01', 'v:latest', r're:\w+[\._]\d+\.jpg$']
-
-
 WORK_ROOT = os.getenv("MY_WORK_ROOT", "")
 PROJECT_ABBR = os.getenv("MY_PROJECT_ABBR", "")
 
@@ -68,9 +54,11 @@ class PathsHandler(object):
     @classmethod
     def _split(cls, filepath, guess=True):
         file_list = cls._path_split(filepath)
-        file_list = file_list[file_list.index(PROJECT_ABBR)+1:]
+        prj_index = file_list.index(PROJECT_ABBR)
+        root_name = file_list[prj_index-1].upper()
+        file_list = file_list[prj_index+1:]
 
-        file_list = ['env:MY_WORK_ROOT', 'env:MY_PROJECT_ABBR']+file_list
+        file_list = ["env:MY_{}_ROOT".format(root_name), "env:MY_PROJECT_ABBR"]+file_list
 
         for string in file_list:
             match = re.search(r'v(\d+)', string)
@@ -84,7 +72,7 @@ class PathsHandler(object):
         if guess:
             file_list[2] = "env:MY_SEQUENCE"
             file_list[3] = "env:MY_SHOT"
-            file_list[4] = "env:MY_TASK_NAME"
+            file_list[4] = "env:MY_TASK_TYPE"
 
         return file_list
 

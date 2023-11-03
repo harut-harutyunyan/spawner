@@ -28,13 +28,32 @@ class SpawnerNode(object):
 
     @classmethod
     def create(cls):
+        selected_node = nuke.selectedNodes()
+        selected_node = None if len(selected_node)==0 else selected_node[0]
+
         node = nuke.createNode(cls.CLASS)
         node.setName("Spawner1")
         node.knob("tile_color").setValue(1280068863)
 
+        script = """
+n = nuke.thisNode()
+k = nuke.thisKnob()
+if k.name() == "inputChange":
+    inpt = n.input(0)
+    if inpt and n.knob("file"):
+        knob = inpt.knob("file")
+        if knob:
+            n["file"].setValue(knob.getValue())
+            n["file"].setEnabled(False)
+    elif n.knob("file"):
+        n["file"].setEnabled(True)
+        n["file"].setValue("")
+"""
+        node["knobChanged"].setValue(script)
+
         knob = nuke.Tab_Knob("Spawner")
         node.addKnob(knob)
-        knob = nuke.Text_Knob("credit1", "", '<font size = 5 style="color:#F2E8C6">Outline VFX</font>')
+        knob = nuke.Text_Knob("credit1", "", '<font size = 5 style="color:#F2E8C6">OutlineVFX</font>')
         node.addKnob(knob)
         knob = nuke.Text_Knob("credit2", "", '<font size = 6 style="color:#FFBB5C"><b>Spawner</b></font>')
         node.addKnob(knob)
@@ -71,7 +90,17 @@ class SpawnerNode(object):
         knob.setVisible(False)
         node.addKnob(knob)
 
+        cls.fill_filepath(selected_node, node)
+
         return node
+
+    @classmethod
+    def fill_filepath(cls, selected_node, spawner):
+        if selected_node:
+            knob = selected_node.knob("file")
+            if knob:
+                spawner["file"].setValue(knob.getValue())
+                spawner["analize"].execute()
 
     @classmethod
     def analize(cls):
@@ -140,7 +169,7 @@ class SpawnerNode(object):
 
         if is_seq:
             if content.length() > 1:
-                seq = "{} {}".format(content.format("%h#%t"), content.format("%s-%e"))
+                seq = "{} {}".format(content.format("%h%p%t"), content.format("%s-%e"))
             else:
                 seq = "{} {}".format(str(content), "1-1")
 
@@ -288,7 +317,7 @@ class SpawnerNode(object):
 
 class SpawnerTemplates(object):
 
-    TEMPLATES_DIR = "/Users/harut/Documents/harut/dev/_templates"
+    TEMPLATES_DIR = os.getenv("SPAWNER_TEMPLATES_DIR", "/mnt/outline/work/_tools/nuke_spawner")
     SHOW_SPECIFIC = True
     ROOT_NAME = "SPAWNER"
 
