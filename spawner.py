@@ -5,6 +5,7 @@ import re
 import nuke
 from loader import PathsHandler
 import pyseq
+import aovtree
 
 
 def deselect_all():
@@ -164,6 +165,10 @@ if k.name() == "inputChange":
         return read_node
 
     @classmethod
+    def _handle_aov_files(cls, folder):
+        return [aovtree.AOVTree.create_and_load(folder)]
+
+    @classmethod
     def _handle_image_files(cls, is_seq, folder, content):
         node_list = []
 
@@ -232,6 +237,15 @@ if k.name() == "inputChange":
         return ext
 
     @classmethod
+    def _search_in_content(cls, content, search):
+        if isinstance(content, list):
+            string = content[0]
+        else:
+            string = str(content)
+
+        return search in string
+
+    @classmethod
     def _post_spawn_connections(cls, spawner, spawned):
         dep = spawner.dependent(nuke.INPUTS)
         for n in dep:
@@ -289,7 +303,11 @@ if k.name() == "inputChange":
         for folder, content in files_dict.items():
             ext = cls._get_content_ext(content)
 
-            if ext in PathsHandler.FILE_FOLMATS[:9]:
+            if ext == ".exr" and cls._search_in_content(content, "_primary_v"):
+                node_list = cls._handle_aov_files(folder)
+                spawned.extend(node_list)
+
+            elif ext in PathsHandler.FILE_FOLMATS[:9]:
                 node_list = cls._handle_image_files(is_seq, folder, content)
                 spawned.extend(node_list)
 
